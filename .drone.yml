@@ -4,11 +4,11 @@ pipeline:
     commands:
       # wait for postgres service to become available
       - |
-        until PGPASSWORD=postgres psql -U postgres -d test -h database \
+        until PGPASSWORD=postgres psql -U postgres -d infomark -h database \
          -c "SELECT 1;" >/dev/null 2>&1; do sleep 1; done
       # query the database
       - |
-        PGPASSWORD=postgres psql -U postgres -d test -h database \
+        PGPASSWORD=postgres psql -U postgres -d infomark -h database \
           -c "SELECT * FROM pg_catalog.pg_tables;"
   test:
     image: golang
