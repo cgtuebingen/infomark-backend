@@ -28,7 +28,15 @@ pipeline:
   build:
     image: golang
     commands:
-      - go build infomark-server-go
+      - go build infomark-server.go
+  test:
+    image: golang
+    commands:
+      - pwd
+      - dir
+      - echo $HOME
+      - cp .infomark-backend.yml.ci ~/.infomark-backend.yml
+      - go build infomark-server.go
 
 services:
   database:
