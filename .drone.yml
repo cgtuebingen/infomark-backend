@@ -1,0 +1,24 @@
+pipeline:
+  ping:
+    image: postgres
+    commands:
+      # wait for postgres service to become available
+      - |
+        until PGPASSWORD=postgres psql -U postgres -d test -h database \
+         -c "SELECT 1;" >/dev/null 2>&1; do sleep 1; done
+      # query the database
+      - |
+        PGPASSWORD=postgres psql -U postgres -d test -h database \
+          -c "SELECT * FROM pg_catalog.pg_tables;"
+  test:
+    image: golang
+    commands:
+      - go get
+
+services:
+  database:
+    image: postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=infomark
