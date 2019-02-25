@@ -19,10 +19,7 @@ pipeline:
   seed:
     image: postgres
     commands:
-      - dir
-      - pwd
       - cd database
-      - dir
       - PGPASSWORD=postgres psql -h 'database' -U 'postgres' -d 'infomark' -f schema.sql
       - PGPASSWORD=postgres psql -h 'database' -U 'postgres' -d 'infomark' -f mock.sql
   build:
