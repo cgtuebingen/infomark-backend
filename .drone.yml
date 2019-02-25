@@ -10,10 +10,23 @@ pipeline:
       - |
         PGPASSWORD=postgres psql -U postgres -d infomark -h database \
           -c "SELECT * FROM pg_catalog.pg_tables;"
-  test:
+  mock:
+    image: python:3
+    commands:
+      - cd database && python3 mock.py
+  seed:
+    image: postgres
+    commands:
+      - dir
+      - pwd
+      - cd database
+      - dir
+      - PGPASSWORD=postgres psql -h 'localhost' -U 'postgres' -d 'infomark' -f schema.sql
+      - PGPASSWORD=postgres psql -h 'localhost' -U 'postgres' -d 'infomark' -f mock.sql
+  build:
     image: golang
     commands:
-      - go get
+      - go build infomark-server-go
 
 services:
   database:
