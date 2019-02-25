@@ -27,19 +27,18 @@ pipeline:
       - PGPASSWORD=postgres psql -h 'database' -U 'postgres' -d 'infomark' -f mock.sql
   build:
     image: golang
+    environment:
+      - GOPROXY=https://gomods.patwie.com/
     commands:
-      - pwd
-      - dir
-      - echo $HOME
       - go build infomark-backend.go
   test:
     image: golang
+    environment:
+      - GOPROXY=https://gomods.patwie.com/
     commands:
-      - pwd
-      - dir
-      - echo $HOME
       - cp .infomark-backend.yml.ci ~/.infomark-backend.yml
-      - go build infomark-backend.go
+      - cd api/app
+      - go test -cover -v
 
 services:
   database:
