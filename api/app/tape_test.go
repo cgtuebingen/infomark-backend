@@ -19,10 +19,8 @@
 package app
 
 import (
-	"encoding/json"
 	olog "log"
 	"net/http"
-	"net/http/httptest"
 	"os"
 
 	"github.com/cgtuebingen/infomark-backend/api/helper"
@@ -32,10 +30,12 @@ import (
 	"github.com/spf13/viper"
 )
 
-// just wrap tape
+type JWTRequest struct {
+	Claims authenticate.AccessClaims
+}
 
-func addJWTClaims(r *http.Request, loginID int64, root bool) {
-	accessToken, err := tokenManager.CreateAccessJWT(authenticate.NewAccessClaims(loginID, root))
+func (t JWTRequest) Modify(r *http.Request) {
+	accessToken, err := tokenManager.CreateAccessJWT(t.Claims)
 	if err != nil {
 		panic(err)
 	}
@@ -43,7 +43,11 @@ func addJWTClaims(r *http.Request, loginID int64, root bool) {
 	r.Header.Add("Authorization", "Bearer "+accessToken)
 }
 
-var tokenManager *authenticate.TokenAuth
+func NewJWTRequest(loginID int64, root bool) JWTRequest {
+	return JWTRequest{
+		Claims: authenticate.NewAccessClaims(loginID, root),
+	}
+}
 
 func SetConfigFile() {
 	var err error
@@ -71,20 +75,20 @@ func InitConfig() {
 	}
 }
 
-func init() {
-	// prepate token management
-	tokenManager, _ = authenticate.NewTokenAuth()
+func PrepareTests() {
+	helper.FakeDatabase()
+	PrepareTokenManager()
 	InitConfig()
 
 }
 
 type Tape struct {
 	otape.Tape
-
 	DB *sqlx.DB
 }
 
 func NewTape() *Tape {
+
 	t := &Tape{}
 	return t
 }
@@ -103,85 +107,4 @@ func (t *Tape) BeforeEach() {
 
 	t.Router, _ = New(t.DB, false)
 
-}
-
-// PlayWithClaims will send a request without any request body (like GET) but with JWT bearer.
-func (t *Tape) PlayWithClaims(method, url string, loginID int64, root bool) *httptest.ResponseRecorder {
-
-	h := make(map[string]interface{})
-	r := otape.BuildDataRequest(method, url, h)
-	addJWTClaims(r, loginID, root)
-	return t.PlayRequest(r)
-}
-
-// PlayDataWithClaims will send a request with given data in body and add JWT bearer.
-func (t *Tape) PlayDataWithClaims(method, url string, data map[string]interface{}, loginID int64, root bool) *httptest.ResponseRecorder {
-	r := otape.BuildDataRequest(method, url, data)
-	addJWTClaims(r, loginID, root)
-	return t.PlayRequest(r)
-}
-
-func (t *Tape) PlayRequestWithClaims(r *http.Request, loginID int64, root bool) *httptest.ResponseRecorder {
-	w := httptest.NewRecorder()
-	addJWTClaims(r, loginID, root)
-	t.Router.ServeHTTP(w, r)
-	return w
-}
-
-func (t *Tape) GetWithClaims(url string, loginID int64, root bool) *httptest.ResponseRecorder {
-	h := make(map[string]interface{})
-	r := otape.BuildDataRequest("GET", url, h)
-	addJWTClaims(r, loginID, root)
-	return t.PlayRequest(r)
-}
-
-func (t *Tape) PostWithClaims(url string, data map[string]interface{}, loginID int64, root bool) *httptest.ResponseRecorder {
-	r := otape.BuildDataRequest("POST", url, data)
-	addJWTClaims(r, loginID, root)
-	return t.PlayRequest(r)
-}
-
-func (t *Tape) PutWithClaims(url string, data map[string]interface{}, loginID int64, root bool) *httptest.ResponseRecorder {
-	r := otape.BuildDataRequest("PUT", url, data)
-	addJWTClaims(r, loginID, root)
-	return t.PlayRequest(r)
-}
-
-func (t *Tape) PatchWithClaims(url string, data map[string]interface{}, loginID int64, root bool) *httptest.ResponseRecorder {
-	r := otape.BuildDataRequest("PATCH", url, data)
-	addJWTClaims(r, loginID, root)
-	return t.PlayRequest(r)
-}
-
-func (t *Tape) DeleteWithClaims(url string, loginID int64, root bool) *httptest.ResponseRecorder {
-	h := make(map[string]interface{})
-	r := otape.BuildDataRequest("DELETE", url, h)
-	addJWTClaims(r, loginID, root)
-	return t.PlayRequest(r)
-}
-
-func (t *Tape) UploadWithClaims(url string, filename string, contentType string, loginID int64, root bool) (*httptest.ResponseRecorder, error) {
-
-	body, ct, err := otape.CreateFileRequestBody(filename, contentType)
-	if err != nil {
-		return nil, err
-	}
-
-	r, err := http.NewRequest("POST", url, body)
-	if err != nil {
-		return nil, err
-	}
-	r.Header.Set("Content-Type", ct)
-	r.Header.Add("X-Forwarded-For", "1.2.3.4")
-	r.Header.Set("User-Agent", "Test-Agent")
-
-	addJWTClaims(r, loginID, root)
-	return t.PlayRequest(r), nil
-}
-
-func (t *Tape) ToH(z interface{}) map[string]interface{} {
-	data, _ := json.Marshal(z)
-	var msgMapTemplate interface{}
-	_ = json.Unmarshal(data, &msgMapTemplate)
-	return msgMapTemplate.(map[string]interface{})
 }

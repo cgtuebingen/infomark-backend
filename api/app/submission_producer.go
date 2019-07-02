@@ -39,9 +39,8 @@ type VoidProducer struct{}
 // Publish of VoidProducer does nothing on purpose (used in unit tests).
 func (t *VoidProducer) Publish(body []byte) error { return nil }
 
-func init() {
+func InitSubmissionProducer() {
 	var err error
-
 	cfg := &service.Config{
 		Connection:   viper.GetString("rabbitmq_connection"),
 		Exchange:     "infomark-worker-exchange",

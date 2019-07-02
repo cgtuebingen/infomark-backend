@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cgtuebingen/infomark-backend/api/helper"
 	"github.com/cgtuebingen/infomark-backend/auth/authenticate"
 	"github.com/cgtuebingen/infomark-backend/auth/authorize"
 	"github.com/cgtuebingen/infomark-backend/symbol"
@@ -58,9 +59,10 @@ func LimitedDecoder(r *http.Request, v interface{}) error {
 	return err
 }
 
-var log = logrus.New()
+var log *logrus.Logger
 
-func init() {
+func RunInit() {
+	log = logrus.New()
 	render.Decode = LimitedDecoder
 
 	log.SetFormatter(&logrus.TextFormatter{
@@ -130,6 +132,10 @@ func NoCache(next http.Handler) http.Handler {
 func New(db *sqlx.DB, log bool) (*chi.Mux, error) {
 	logger := logrus.StandardLogger()
 
+	helper.InitConfig()
+	authenticate.PrepareSessionManager()
+	InitPrometheus()
+
 	if err := db.Ping(); err != nil {
 		logger.WithField("module", "database").Error(err)
 		return nil, err
@@ -196,6 +202,7 @@ func New(db *sqlx.DB, log bool) (*chi.Mux, error) {
 						r.Delete("/", appAPI.User.DeleteHandler)
 						r.Post("/emails", appAPI.User.SendEmailHandler)
 					})
+					r.With(authorize.RequiresAtLeastCourseRole(authorize.ADMIN)).Get("/find", appAPI.User.Find)
 				})
 
 				r.Route("/courses", func(r chi.Router) {

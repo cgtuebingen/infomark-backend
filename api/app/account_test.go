@@ -34,12 +34,15 @@ import (
 )
 
 func TestAccount(t *testing.T) {
+	PrepareTests()
 	g := goblin.Goblin(t)
 	email.DefaultMail = email.VoidMail
 
 	tape := &Tape{}
 
 	var stores *Stores
+	adminJWT := NewJWTRequest(1, true)
+	noAdminJWT := NewJWTRequest(1, false)
 
 	g.Describe("Account", func() {
 
@@ -52,25 +55,19 @@ func TestAccount(t *testing.T) {
 			w := tape.Get("/api/v1/account")
 			g.Assert(w.Code).Equal(http.StatusUnauthorized)
 
-			w = tape.GetWithClaims("/api/v1/account", 1, true)
+			w = tape.Get("/api/v1/account", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
-		})
-
-		g.Xit("Query should not return info when claims are invalid", func() {
-			// we removed that endpoint
-			w := tape.GetWithClaims("/api/v1/account", 0, true)
-			g.Assert(w.Code).Equal(http.StatusUnauthorized)
 		})
 
 		g.It("Should get all enrollments", func() {
 			enrollmentsExpected, err := stores.User.GetEnrollments(1)
 			g.Assert(err).Equal(nil)
 
-			w := tape.GetWithClaims("/api/v1/account/enrollments", 1, true)
+			w := tape.Get("/api/v1/account/enrollments", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
-			enrollmentsActual := []userEnrollmentResponse{}
+			enrollmentsActual := []UserEnrollmentResponse{}
 			err = json.NewDecoder(w.Body).Decode(&enrollmentsActual)
 			g.Assert(err).Equal(nil)
 			g.Assert(len(enrollmentsActual)).Equal(len(enrollmentsExpected))
@@ -170,7 +167,7 @@ func TestAccount(t *testing.T) {
 			w := tape.Patch("/api/v1/account", data)
 			g.Assert(w.Code).Equal(http.StatusUnauthorized)
 
-			w = tape.PatchWithClaims("/api/v1/account", data, 1, true)
+			w = tape.Patch("/api/v1/account", data, adminJWT)
 			g.Assert(w.Code).Equal(http.StatusNoContent)
 		})
 
@@ -184,7 +181,7 @@ func TestAccount(t *testing.T) {
 				"old_plain_password": "test_false",
 			}
 
-			w := tape.PatchWithClaims("/api/v1/account", data, 1, true)
+			w := tape.Patch("/api/v1/account", data, adminJWT)
 			g.Assert(w.Code).Equal(http.StatusBadRequest)
 		})
 
@@ -198,7 +195,7 @@ func TestAccount(t *testing.T) {
 				"old_plain_password": "test",
 			}
 
-			w := tape.PatchWithClaims("/api/v1/account", data, 1, true)
+			w := tape.Patch("/api/v1/account", data, adminJWT)
 			g.Assert(w.Code).Equal(http.StatusNoContent)
 
 			userAfter, err := stores.User.Get(1)
@@ -219,7 +216,7 @@ func TestAccount(t *testing.T) {
 				"old_plain_password": "test",
 			}
 
-			w := tape.PatchWithClaims("/api/v1/account", data, 1, true)
+			w := tape.Patch("/api/v1/account", data, adminJWT)
 			g.Assert(w.Code).Equal(http.StatusNoContent)
 
 			userAfter, err := stores.User.Get(1)
@@ -240,7 +237,7 @@ func TestAccount(t *testing.T) {
 				"old_plain_password": "test",
 			}
 
-			w := tape.PatchWithClaims("/api/v1/account", data, 1, true)
+			w := tape.Patch("/api/v1/account", data, adminJWT)
 			g.Assert(w.Code).Equal(http.StatusBadRequest)
 		})
 
@@ -253,7 +250,7 @@ func TestAccount(t *testing.T) {
 				"old_plain_password": "test",
 			}
 
-			w := tape.PatchWithClaims("/api/v1/account", data, 1, true)
+			w := tape.Patch("/api/v1/account", data, adminJWT)
 			g.Assert(w.Code).Equal(http.StatusNoContent)
 
 			userAfter, err := stores.User.Get(1)
@@ -272,17 +269,17 @@ func TestAccount(t *testing.T) {
 			g.Assert(helper.NewAvatarFileHandle(1).Exists()).Equal(false)
 
 			// no avatar by default
-			w := tape.GetWithClaims("/api/v1/account", 1, true)
+			w := tape.Get("/api/v1/account", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
-			userReturned := &userResponse{}
+			userReturned := &UserResponse{}
 			err := json.NewDecoder(w.Body).Decode(userReturned)
 			g.Assert(err).Equal(nil)
 			g.Assert(userReturned.AvatarURL.Valid).Equal(false)
 
 			// upload avatar
 			avatarFilename := fmt.Sprintf("%s/default-avatar.jpg", viper.GetString("fixtures_dir"))
-			w, err = tape.UploadWithClaims("/api/v1/account/avatar", avatarFilename, "image/jpg", 1, true)
+			w, err = tape.Upload("/api/v1/account/avatar", avatarFilename, "image/jpg", adminJWT)
 			g.Assert(err).Equal(nil)
 			g.Assert(w.Code).Equal(http.StatusOK)
 			g.Assert(helper.NewAvatarFileHandle(1).Exists()).Equal(true)
@@ -292,13 +289,13 @@ func TestAccount(t *testing.T) {
 			g.Assert(user.AvatarURL.Valid).Equal(true)
 
 			// there should be now an avatar
-			w = tape.GetWithClaims("/api/v1/account", 1, true)
+			w = tape.Get("/api/v1/account", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 			err = json.NewDecoder(w.Body).Decode(&userReturned)
 			g.Assert(err).Equal(nil)
 			g.Assert(userReturned.AvatarURL.Valid).Equal(true)
 
-			w = tape.GetWithClaims("/api/v1/account/avatar", 1, true)
+			w = tape.Get("/api/v1/account/avatar", adminJWT)
 			g.Assert(err).Equal(nil)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
@@ -315,17 +312,17 @@ func TestAccount(t *testing.T) {
 			g.Assert(helper.NewAvatarFileHandle(1).Exists()).Equal(false)
 
 			// no avatar by default
-			w := tape.GetWithClaims("/api/v1/account", 1, true)
+			w := tape.Get("/api/v1/account", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
-			userReturned := &userResponse{}
+			userReturned := &UserResponse{}
 			err := json.NewDecoder(w.Body).Decode(userReturned)
 			g.Assert(err).Equal(nil)
 			g.Assert(userReturned.AvatarURL.Valid).Equal(false)
 
 			// upload avatar
 			avatarFilename := fmt.Sprintf("%s/default-avatar.png", viper.GetString("fixtures_dir"))
-			w, err = tape.UploadWithClaims("/api/v1/account/avatar", avatarFilename, "image/png", 1, true)
+			w, err = tape.Upload("/api/v1/account/avatar", avatarFilename, "image/png", adminJWT)
 			g.Assert(err).Equal(nil)
 			g.Assert(w.Code).Equal(http.StatusOK)
 			g.Assert(helper.NewAvatarFileHandle(1).Exists()).Equal(true)
@@ -335,13 +332,13 @@ func TestAccount(t *testing.T) {
 			g.Assert(user.AvatarURL.Valid).Equal(true)
 
 			// there should be now an avatar
-			w = tape.GetWithClaims("/api/v1/account", 1, true)
+			w = tape.Get("/api/v1/account", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 			err = json.NewDecoder(w.Body).Decode(&userReturned)
 			g.Assert(err).Equal(nil)
 			g.Assert(userReturned.AvatarURL.Valid).Equal(true)
 
-			w = tape.GetWithClaims("/api/v1/account/avatar", 1, true)
+			w = tape.Get("/api/v1/account/avatar", adminJWT)
 			g.Assert(err).Equal(nil)
 			g.Assert(w.Code).Equal(http.StatusOK)
 			g.Assert(strings.HasSuffix(w.Header().Get("Content-Type"), "png")).Equal(true)
@@ -369,16 +366,16 @@ func TestAccount(t *testing.T) {
 			g.Assert(helper.NewAvatarFileHandle(1).Exists()).Equal(false)
 
 			// no avatar by default
-			w := tape.GetWithClaims("/api/v1/account", 1, true)
+			w := tape.Get("/api/v1/account", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
-			userReturned := &userResponse{}
+			userReturned := &UserResponse{}
 			err = json.NewDecoder(w.Body).Decode(userReturned)
 			g.Assert(err).Equal(nil)
 			g.Assert(userReturned.AvatarURL.Valid).Equal(false)
 
 			// upload avatar
-			w, err = tape.UploadWithClaims("/api/v1/account/avatar", "/tmp/foo.jpg", "image/jpg", 1, true)
+			w, err = tape.Upload("/api/v1/account/avatar", "/tmp/foo.jpg", "image/jpg", adminJWT)
 			g.Assert(err).Equal(nil)
 			g.Assert(w.Code).Equal(http.StatusBadRequest)
 			g.Assert(helper.NewAvatarFileHandle(1).Exists()).Equal(false)
@@ -393,22 +390,22 @@ func TestAccount(t *testing.T) {
 
 			// upload avatar
 			avatarFilename := fmt.Sprintf("%s/default-avatar.jpg", viper.GetString("fixtures_dir"))
-			w, err := tape.UploadWithClaims("/api/v1/account/avatar", avatarFilename, "image/jpg", 1, false)
+			w, err := tape.Upload("/api/v1/account/avatar", avatarFilename, "image/jpg", noAdminJWT)
 			g.Assert(err).Equal(nil)
 			g.Assert(w.Code).Equal(http.StatusOK)
 			g.Assert(helper.NewAvatarFileHandle(1).Exists()).Equal(true)
 
 			// there should be now an avatar
-			w = tape.GetWithClaims("/api/v1/account", 1, false)
+			w = tape.Get("/api/v1/account", noAdminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
-			userReturned := &userResponse{}
+			userReturned := &UserResponse{}
 			err = json.NewDecoder(w.Body).Decode(userReturned)
 			g.Assert(err).Equal(nil)
 			g.Assert(userReturned.AvatarURL.Valid).Equal(true)
 
 			// delete
-			w = tape.DeleteWithClaims("/api/v1/account/avatar", 1, false)
+			w = tape.Delete("/api/v1/account/avatar", noAdminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 			g.Assert(helper.NewAvatarFileHandle(1).Exists()).Equal(false)

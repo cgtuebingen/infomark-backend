@@ -43,6 +43,7 @@ func DBGetInt2(tape *Tape, stmt string, param1 int64, param2 int64) (int, error)
 }
 
 func TestCourse(t *testing.T) {
+	PrepareTests()
 
 	g := goblin.Goblin(t)
 	email.DefaultMail = email.VoidMail
@@ -52,6 +53,11 @@ func TestCourse(t *testing.T) {
 	tape := &Tape{}
 
 	var stores *Stores
+
+	studentJWT := NewJWTRequest(112, false)
+	tutorJWT := NewJWTRequest(2, false)
+	adminJWT := NewJWTRequest(1, true)
+	noAdminJWT := NewJWTRequest(1, false)
 
 	g.Describe("Course", func() {
 
@@ -66,13 +72,13 @@ func TestCourse(t *testing.T) {
 			w := tape.Get("/api/v1/courses")
 			g.Assert(w.Code).Equal(http.StatusUnauthorized)
 
-			w = tape.GetWithClaims("/api/v1/courses", 1, true)
+			w = tape.Get("/api/v1/courses", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 		})
 
 		g.It("Should list all courses", func() {
-			w := tape.GetWithClaims("/api/v1/courses", 1, true)
+			w := tape.Get("/api/v1/courses", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 			coursesActual := []model.Course{}
@@ -83,10 +89,10 @@ func TestCourse(t *testing.T) {
 
 		g.It("Should get a specific course", func() {
 
-			w := tape.GetWithClaims("/api/v1/courses/1", 1, true)
+			w := tape.Get("/api/v1/courses/1", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
-			courseActual := &courseResponse{}
+			courseActual := &CourseResponse{}
 			err := json.NewDecoder(w.Body).Decode(courseActual)
 			g.Assert(err).Equal(nil)
 
@@ -112,8 +118,8 @@ func TestCourse(t *testing.T) {
 			)
 			g.Assert(err).Equal(nil)
 
-			w := tape.GetWithClaims("/api/v1/courses/1/enrollments", 1, true)
-			enrollmentsActual := []enrollmentResponse{}
+			w := tape.Get("/api/v1/courses/1/enrollments", adminJWT)
+			enrollmentsActual := []EnrollmentResponse{}
 			err = json.NewDecoder(w.Body).Decode(&enrollmentsActual)
 			g.Assert(err).Equal(nil)
 			g.Assert(len(enrollmentsActual)).Equal(numberEnrollmentsExpected)
@@ -130,8 +136,8 @@ func TestCourse(t *testing.T) {
 			)
 			g.Assert(err).Equal(nil)
 
-			w := tape.GetWithClaims("/api/v1/courses/1/enrollments?roles=0", 1, true)
-			enrollmentsActual := []enrollmentResponse{}
+			w := tape.Get("/api/v1/courses/1/enrollments?roles=0", adminJWT)
+			enrollmentsActual := []EnrollmentResponse{}
 			err = json.NewDecoder(w.Body).Decode(&enrollmentsActual)
 			g.Assert(err).Equal(nil)
 			g.Assert(len(enrollmentsActual)).Equal(numberEnrollmentsExpected)
@@ -146,8 +152,8 @@ func TestCourse(t *testing.T) {
 			)
 			g.Assert(err).Equal(nil)
 
-			w := tape.GetWithClaims("/api/v1/courses/1/enrollments?q=chi", 1, false)
-			enrollmentsActual := []enrollmentResponse{}
+			w := tape.Get("/api/v1/courses/1/enrollments?q=chi", noAdminJWT)
+			enrollmentsActual := []EnrollmentResponse{}
 			err = json.NewDecoder(w.Body).Decode(&enrollmentsActual)
 			g.Assert(err).Equal(nil)
 			g.Assert(len(enrollmentsActual)).Equal(len(enrollmentsExpected))
@@ -164,8 +170,8 @@ func TestCourse(t *testing.T) {
 			)
 			g.Assert(err).Equal(nil)
 
-			w := tape.GetWithClaims("/api/v1/courses/1/enrollments?roles=1", 1, false)
-			enrollmentsActual := []enrollmentResponse{}
+			w := tape.Get("/api/v1/courses/1/enrollments?roles=1", noAdminJWT)
+			enrollmentsActual := []EnrollmentResponse{}
 			err = json.NewDecoder(w.Body).Decode(&enrollmentsActual)
 			g.Assert(err).Equal(nil)
 			g.Assert(len(enrollmentsActual)).Equal(numberEnrollmentsExpected)
@@ -182,8 +188,8 @@ func TestCourse(t *testing.T) {
 			)
 			g.Assert(err).Equal(nil)
 
-			w := tape.GetWithClaims("/api/v1/courses/1/enrollments?roles=0,1", 1, false)
-			enrollmentsActual := []enrollmentResponse{}
+			w := tape.Get("/api/v1/courses/1/enrollments?roles=0,1", noAdminJWT)
+			enrollmentsActual := []EnrollmentResponse{}
 			err = json.NewDecoder(w.Body).Decode(&enrollmentsActual)
 			g.Assert(err).Equal(nil)
 			g.Assert(len(enrollmentsActual)).Equal(numberEnrollmentsExpected)
@@ -201,18 +207,16 @@ func TestCourse(t *testing.T) {
 			g.Assert(err).Equal(nil)
 
 			// 112 is a student
-			w := tape.GetWithClaims("/api/v1/courses/1/enrollments?roles=0", 112, false)
-			enrollmentsActual := []enrollmentResponse{}
+			w := tape.Get("/api/v1/courses/1/enrollments?roles=0", studentJWT)
+			enrollmentsActual := []EnrollmentResponse{}
 			err = json.NewDecoder(w.Body).Decode(&enrollmentsActual)
 			g.Assert(err).Equal(nil)
 			g.Assert(len(enrollmentsActual)).Equal(numberEnrollmentsExpected)
 		})
 
 		g.It("Should be able to filter enrollments (but not see field protected by privacy), when role=tutor,student", func() {
-			// 112 is a student
-			userID := int64(112)
-			w := tape.GetWithClaims("/api/v1/courses/1/enrollments?roles=0", userID, false)
-			enrollmentsActual := []enrollmentResponse{}
+			w := tape.Get("/api/v1/courses/1/enrollments?roles=0", studentJWT)
+			enrollmentsActual := []EnrollmentResponse{}
 			err := json.NewDecoder(w.Body).Decode(&enrollmentsActual)
 			g.Assert(err).Equal(nil)
 
@@ -227,7 +231,7 @@ func TestCourse(t *testing.T) {
 		})
 
 		g.It("Creating course should require body", func() {
-			w := tape.PlayWithClaims("POST", "/api/v1/courses", 1, true)
+			w := tape.Post("/api/v1/courses", make(map[string]interface{}), adminJWT)
 			g.Assert(w.Code).Equal(http.StatusBadRequest)
 		})
 
@@ -247,23 +251,23 @@ func TestCourse(t *testing.T) {
 			g.Assert(entrySent.Validate()).Equal(nil)
 
 			// students
-			w := tape.PlayDataWithClaims("POST", "/api/v1/courses", tape.ToH(entrySent), 112, false)
+			w := tape.Post("/api/v1/courses", tape.ToH(entrySent), studentJWT)
 			g.Assert(w.Code).Equal(http.StatusForbidden)
 
 			// tutors
-			w = tape.PlayDataWithClaims("POST", "/api/v1/courses", tape.ToH(entrySent), 2, false)
+			w = tape.Post("/api/v1/courses", tape.ToH(entrySent), tutorJWT)
 			g.Assert(w.Code).Equal(http.StatusForbidden)
 
 			// admin in course (cannot be admin, course does not exists yet)
-			w = tape.PlayDataWithClaims("POST", "/api/v1/courses", tape.ToH(entrySent), 1, false)
+			w = tape.Post("/api/v1/courses", tape.ToH(entrySent), noAdminJWT)
 			g.Assert(w.Code).Equal(http.StatusForbidden)
 
 			// admin
-			w = tape.PlayDataWithClaims("POST", "/api/v1/courses", tape.ToH(entrySent), 1, true)
+			w = tape.Post("/api/v1/courses", tape.ToH(entrySent), adminJWT)
 			g.Assert(w.Code).Equal(http.StatusCreated)
 
 			// verify body
-			courseReturn := &courseResponse{}
+			courseReturn := &CourseResponse{}
 			err = json.NewDecoder(w.Body).Decode(&courseReturn)
 			g.Assert(err).Equal(nil)
 			g.Assert(courseReturn.Name).Equal(entrySent.Name)
@@ -287,10 +291,10 @@ func TestCourse(t *testing.T) {
 		})
 
 		g.It("Should send email to all enrolled users", func() {
-			w := tape.PostWithClaims("/api/v1/courses/1/emails", H{
+			w := tape.Post("/api/v1/courses/1/emails", H{
 				"subject": "subj",
 				"body":    "text",
-			}, 1, true)
+			}, adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 		})
 
@@ -312,15 +316,15 @@ func TestCourse(t *testing.T) {
 			g.Assert(entrySent.Validate()).Equal(nil)
 
 			// students
-			w := tape.PlayDataWithClaims("PUT", "/api/v1/courses/1", tape.ToH(entrySent), 112, false)
+			w := tape.Put("/api/v1/courses/1", tape.ToH(entrySent), studentJWT)
 			g.Assert(w.Code).Equal(http.StatusForbidden)
 
 			// tutors
-			w = tape.PlayDataWithClaims("PUT", "/api/v1/courses/1", tape.ToH(entrySent), 2, false)
+			w = tape.Put("/api/v1/courses/1", tape.ToH(entrySent), tutorJWT)
 			g.Assert(w.Code).Equal(http.StatusForbidden)
 
 			// admin
-			w = tape.PlayDataWithClaims("PUT", "/api/v1/courses/1", tape.ToH(entrySent), 1, false)
+			w = tape.Put("/api/v1/courses/1", tape.ToH(entrySent), adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 			entryAfter, err := stores.Course.Get(1)
@@ -346,15 +350,15 @@ func TestCourse(t *testing.T) {
 			g.Assert(len(entriesAfter)).Equal(len(entriesBefore))
 
 			// students
-			w = tape.PlayWithClaims("DELETE", "/api/v1/courses/1", 112, false)
+			w = tape.Delete("/api/v1/courses/1", studentJWT)
 			g.Assert(w.Code).Equal(http.StatusForbidden)
 
 			// tutors
-			w = tape.PlayWithClaims("DELETE", "/api/v1/courses/1", 2, false)
+			w = tape.Delete("/api/v1/courses/1", tutorJWT)
 			g.Assert(w.Code).Equal(http.StatusForbidden)
 
 			// admin
-			w = tape.PlayWithClaims("DELETE", "/api/v1/courses/1", 1, false)
+			w = tape.Delete("/api/v1/courses/1", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 			// verify a course less exists
@@ -364,17 +368,15 @@ func TestCourse(t *testing.T) {
 		})
 
 		g.It("Non-Global root enroll as students", func() {
-
 			courseID := int64(1)
-			userID := int64(112)
 
-			w := tape.PostWithClaims("/api/v1/courses/1/enrollments", helper.H{}, userID, false)
+			w := tape.Post("/api/v1/courses/1/enrollments", helper.H{}, studentJWT)
 			g.Assert(w.Code).Equal(http.StatusCreated)
 
 			role, err := DBGetInt2(
 				tape,
 				"SELECT role FROM user_course WHERE course_id = $1 and user_id = $2",
-				courseID, userID,
+				courseID, studentJWT.Claims.LoginID,
 			)
 			g.Assert(err).Equal(nil)
 			g.Assert(role).Equal(0)
@@ -384,15 +386,15 @@ func TestCourse(t *testing.T) {
 		g.It("Global root enroll as admins", func() {
 
 			courseID := int64(1)
-			userID := int64(112)
+			localAdminJWT := NewJWTRequest(112, true)
 
-			w := tape.PostWithClaims("/api/v1/courses/1/enrollments", helper.H{}, userID, true)
+			w := tape.Post("/api/v1/courses/1/enrollments", helper.H{}, localAdminJWT)
 			g.Assert(w.Code).Equal(http.StatusCreated)
 
 			role, err := DBGetInt2(
 				tape,
 				"SELECT role FROM user_course WHERE course_id = $1 and user_id = $2",
-				courseID, userID,
+				courseID, localAdminJWT.Claims.LoginID,
 			)
 			g.Assert(err).Equal(nil)
 			g.Assert(role).Equal(2)
@@ -410,7 +412,7 @@ func TestCourse(t *testing.T) {
 			)
 			g.Assert(err).Equal(nil)
 
-			w := tape.DeleteWithClaims("/api/v1/courses/1/enrollments", 112, false)
+			w := tape.Delete("/api/v1/courses/1/enrollments", studentJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 			numberEnrollmentsAfter, err := DBGetInt(
@@ -435,7 +437,7 @@ func TestCourse(t *testing.T) {
 			g.Assert(err).Equal(nil)
 
 			// admin
-			w := tape.DeleteWithClaims("/api/v1/courses/1/enrollments/113", 1, false)
+			w := tape.Delete("/api/v1/courses/1/enrollments/113", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 			numberEnrollmentsAfter, err := DBGetInt(
@@ -460,7 +462,7 @@ func TestCourse(t *testing.T) {
 			g.Assert(err).Equal(nil)
 
 			// admin
-			w := tape.DeleteWithClaims("/api/v1/courses/1/enrollments/2", 1, false)
+			w := tape.Delete("/api/v1/courses/1/enrollments/2", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusBadRequest)
 
 			numberEnrollmentsAfter, err := DBGetInt(
@@ -475,7 +477,6 @@ func TestCourse(t *testing.T) {
 
 		g.It("Cannot disenroll as a tutor from course", func() {
 			courseID := int64(1)
-			userID := int64(2)
 
 			numberEnrollmentsBefore, err := DBGetInt(
 				tape,
@@ -484,7 +485,7 @@ func TestCourse(t *testing.T) {
 			)
 			g.Assert(err).Equal(nil)
 
-			w := tape.DeleteWithClaims("/api/v1/courses/1/enrollments", userID, false)
+			w := tape.Delete("/api/v1/courses/1/enrollments", tutorJWT)
 			g.Assert(w.Code).Equal(http.StatusBadRequest)
 
 			numberEnrollmentsAfter, err := DBGetInt(
@@ -499,37 +500,37 @@ func TestCourse(t *testing.T) {
 		g.It("should see bids in course", func() {
 
 			// tutors cannot use this
-			w := tape.GetWithClaims("/api/v1/courses/1/bids", 2, false)
+			w := tape.Get("/api/v1/courses/1/bids", tutorJWT)
 			g.Assert(w.Code).Equal(http.StatusBadRequest)
 
 			// admins will see all
-			w = tape.GetWithClaims("/api/v1/courses/1/bids", 1, false)
+			w = tape.Get("/api/v1/courses/1/bids", noAdminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 			// students will see their own
-			w = tape.GetWithClaims("/api/v1/courses/1/bids", 112, false)
+			w = tape.Get("/api/v1/courses/1/bids", studentJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 		})
 
 		g.It("Show user enrollement info", func() {
 
-			w := tape.GetWithClaims("/api/v1/courses/1/enrollments/2", 122, false)
+			w := tape.Get("/api/v1/courses/1/enrollments/2", NewJWTRequest(122, false))
 			g.Assert(w.Code).Equal(http.StatusForbidden)
 
-			w = tape.GetWithClaims("/api/v1/courses/1/enrollments/2", 3, false)
+			w = tape.Get("/api/v1/courses/1/enrollments/2", NewJWTRequest(3, false))
 			g.Assert(w.Code).Equal(http.StatusForbidden)
 
-			result := enrollmentResponse{}
+			result := EnrollmentResponse{}
 
-			w = tape.GetWithClaims("/api/v1/courses/1/enrollments/2", 1, false)
+			w = tape.Get("/api/v1/courses/1/enrollments/2", noAdminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 			err := json.NewDecoder(w.Body).Decode(&result)
 			g.Assert(err).Equal(nil)
 			g.Assert(result.User.ID).Equal(int64(2))
 			g.Assert(result.Role).Equal(int64(1))
 
-			w = tape.GetWithClaims("/api/v1/courses/1/enrollments/112", 1, false)
+			w = tape.Get("/api/v1/courses/1/enrollments/112", noAdminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 			err = json.NewDecoder(w.Body).Decode(&result)
 			g.Assert(err).Equal(nil)
@@ -540,19 +541,19 @@ func TestCourse(t *testing.T) {
 
 		g.It("Should update role", func() {
 
-			w := tape.PutWithClaims("/api/v1/courses/1/enrollments/112", H{"role": 1}, 112, false)
+			w := tape.Put("/api/v1/courses/1/enrollments/112", H{"role": 1}, studentJWT)
 			g.Assert(w.Code).Equal(http.StatusForbidden)
 
-			w = tape.PutWithClaims("/api/v1/courses/1/enrollments/112", H{"role": 1}, 3, false)
+			w = tape.Put("/api/v1/courses/1/enrollments/112", H{"role": 1}, tutorJWT)
 			g.Assert(w.Code).Equal(http.StatusForbidden)
 
-			w = tape.PutWithClaims("/api/v1/courses/1/enrollments/112", H{"role": 1}, 1, false)
+			w = tape.Put("/api/v1/courses/1/enrollments/112", H{"role": 1}, noAdminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
-			w = tape.GetWithClaims("/api/v1/courses/1/enrollments/112", 1, false)
+			w = tape.Get("/api/v1/courses/1/enrollments/112", noAdminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
-			result := enrollmentResponse{}
+			result := EnrollmentResponse{}
 			err := json.NewDecoder(w.Body).Decode(&result)
 			g.Assert(err).Equal(nil)
 			g.Assert(result.User.ID).Equal(int64(112))
@@ -564,23 +565,23 @@ func TestCourse(t *testing.T) {
 			url := "/api/v1/courses/1"
 
 			// global root can do whatever they want
-			w := tape.GetWithClaims(url, 1, true)
+			w := tape.Get(url, adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 			// enrolled tutors can access
-			w = tape.GetWithClaims(url, 2, false)
+			w = tape.Get(url, tutorJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 			// enrolled students can access
-			w = tape.GetWithClaims(url, 112, false)
+			w = tape.Get(url, studentJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 			// disenroll student
-			w = tape.DeleteWithClaims("/api/v1/courses/1/enrollments", 112, false)
+			w = tape.Delete("/api/v1/courses/1/enrollments", studentJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 			// cannot access anymore
-			w = tape.GetWithClaims(url, 112, false)
+			w = tape.Get(url, studentJWT)
 			g.Assert(w.Code).Equal(http.StatusForbidden)
 		})
 

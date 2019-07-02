@@ -30,12 +30,15 @@ import (
 )
 
 func TestUser(t *testing.T) {
+	PrepareTests()
 	g := goblin.Goblin(t)
 	email.DefaultMail = email.VoidMail
 
 	tape := &Tape{}
 
 	var stores *Stores
+
+	adminJWT := NewJWTRequest(1, true)
 
 	g.Describe("User", func() {
 
@@ -49,7 +52,7 @@ func TestUser(t *testing.T) {
 			w := tape.Get("/api/v1/users")
 			g.Assert(w.Code).Equal(http.StatusUnauthorized)
 
-			w = tape.GetWithClaims("/api/v1/users", 1, true)
+			w = tape.Get("/api/v1/users", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 		})
 
@@ -57,7 +60,20 @@ func TestUser(t *testing.T) {
 			usersExpected, err := stores.User.GetAll()
 			g.Assert(err).Equal(nil)
 
-			w := tape.GetWithClaims("/api/v1/users", 1, true)
+			w := tape.Get("/api/v1/users", adminJWT)
+			g.Assert(w.Code).Equal(http.StatusOK)
+
+			usersActual := []model.User{}
+			err = json.NewDecoder(w.Body).Decode(&usersActual)
+			g.Assert(err).Equal(nil)
+			g.Assert(len(usersActual)).Equal(len(usersExpected))
+		})
+
+		g.It("Query should find a user", func() {
+			usersExpected, err := stores.User.Find("%%meinhard%%")
+			g.Assert(err).Equal(nil)
+
+			w := tape.Get("/api/v1/users/find?query=meinhard", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 			usersActual := []model.User{}
@@ -71,10 +87,10 @@ func TestUser(t *testing.T) {
 			userExpected, err := stores.User.Get(1)
 			g.Assert(err).Equal(nil)
 
-			w := tape.GetWithClaims("/api/v1/users/1", 1, true)
+			w := tape.Get("/api/v1/users/1", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
-			userActual := &userResponse{}
+			userActual := &UserResponse{}
 			err = json.NewDecoder(w.Body).Decode(userActual)
 			g.Assert(err).Equal(nil)
 
@@ -117,7 +133,7 @@ func TestUser(t *testing.T) {
 			err = userSent.Validate()
 			g.Assert(err).Equal(nil)
 
-			w := tape.PutWithClaims("/api/v1/users/1", helper.ToH(userSent), 1, true)
+			w := tape.Put("/api/v1/users/1", helper.ToH(userSent), adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 			userAfter, err := stores.User.Get(1)
@@ -136,7 +152,7 @@ func TestUser(t *testing.T) {
 			w := tape.Delete("/api/v1/users/1")
 			g.Assert(w.Code).Equal(http.StatusUnauthorized)
 
-			w = tape.DeleteWithClaims("/api/v1/users/1", 1, true)
+			w = tape.Delete("/api/v1/users/1", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 			usersAfter, err := stores.User.GetAll()
@@ -148,7 +164,7 @@ func TestUser(t *testing.T) {
 			w := tape.Get("/api/v1/me")
 			g.Assert(w.Code).Equal(http.StatusUnauthorized)
 
-			w = tape.GetWithClaims("/api/v1/me", 1, true)
+			w = tape.Get("/api/v1/me", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 		})
 
@@ -156,10 +172,10 @@ func TestUser(t *testing.T) {
 			userExpected, err := stores.User.Get(1)
 			g.Assert(err).Equal(nil)
 
-			w := tape.GetWithClaims("/api/v1/me", 1, true)
+			w := tape.Get("/api/v1/me", adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
-			userActual := &userResponse{}
+			userActual := &UserResponse{}
 			err = json.NewDecoder(w.Body).Decode(&userActual)
 			g.Assert(err).Equal(nil)
 
@@ -181,7 +197,7 @@ func TestUser(t *testing.T) {
 				"first_name": "blub",
 			}
 
-			w := tape.PutWithClaims("/api/v1/me", dataSent, 1, true)
+			w := tape.Put("/api/v1/me", dataSent, adminJWT)
 			g.Assert(w.Code).Equal(http.StatusBadRequest)
 		})
 
@@ -211,7 +227,7 @@ func TestUser(t *testing.T) {
 			err = userSent.Validate()
 			g.Assert(err).Equal(nil)
 
-			w := tape.PutWithClaims("/api/v1/me", helper.ToH(userSent), 1, true)
+			w := tape.Put("/api/v1/me", helper.ToH(userSent), adminJWT)
 			g.Assert(w.Code).Equal(http.StatusOK)
 
 			userAfter, err := stores.User.Get(1)
